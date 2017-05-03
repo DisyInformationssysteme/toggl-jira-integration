@@ -3,6 +3,7 @@ import processTimeTrackingEntries
 import os
 import logging
 
+
 class JiraTest(unittest.TestCase):
 
     configuration = {}
@@ -23,7 +24,7 @@ class JiraTest(unittest.TestCase):
                 'id': 37984387,
                 'wid': 309109,
                 'cid': 17545244,
-                'name': 'TENT-1499 - WaWis-Konzepterstellung',
+                'name': 'JIRTEST-1234 - Project 1',
                 'billable': False,
                 'is_private': True,
                 'active': True,
@@ -39,7 +40,7 @@ class JiraTest(unittest.TestCase):
                 'id': 36319838,
                 'wid': 309109,
                 'cid': 19159353,
-                'name': 'SKADA-58 - [SKaDa] Auslieferungen',
+                'name': 'JIRTEST-1235 - Project 2',
                 'billable': False,
                 'is_private': True,
                 'active': True,
@@ -55,7 +56,7 @@ class JiraTest(unittest.TestCase):
                 'id': 36116304,
                 'wid': 309109,
                 'cid': 19159353,
-                'name': 'SKADA-57 - QS Allg.',
+                'name': 'JIRTEST-4567 - Project 3',
                 'billable': False,
                 'is_private': True,
                 'active': True,
@@ -71,7 +72,7 @@ class JiraTest(unittest.TestCase):
                 'id': 35679782,
                 'wid': 309109,
                 'cid': 16226102,
-                'name': 'TENT-1481 - [NOKIS Support 2017] - Allg. Support',
+                'name': 'JIRTEST-7878 - Project 4',
                 'billable': False,
                 'is_private': True,
                 'active': True,
@@ -86,7 +87,7 @@ class JiraTest(unittest.TestCase):
                 'id': 35679419,
                 'wid': 309109,
                 'cid': 16226102,
-                'name': '[NOKIS Support 2017] PM',
+                'name': 'Project without issue number',
                 'billable': False,
                 'is_private': True,
                 'active': True,
