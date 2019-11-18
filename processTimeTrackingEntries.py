@@ -188,7 +188,7 @@ def main():
     global _logger
     config_file = "config.ini"
     try:
-        opts, args = getopt.getopt(sys.argv, "c", ["configuration"])
+        opts, args = getopt.getopt(sys.argv[1:], "c:", ["configuration"])
     except getopt.GetoptError:
         print("processTimeTrackingEntries.py -c <configurationfile>")
         sys.exit(2)
