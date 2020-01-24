@@ -15,7 +15,8 @@
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
 # THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 import json
 import datetime
@@ -53,6 +54,7 @@ def read_configuration(config_file_name):
                      'myTogglApiToken': None,
                      'myWorkspace': None,
                      'togglStartTime': None,
+                     'useLogFile': False,
                      'logFile': None,
                      'logLevel': None,
                      'issue_number_regex_expression': None,
@@ -87,8 +89,12 @@ def read_configuration(config_file_name):
                 datetime.datetime.utcnow() - datetime.timedelta(int(config.get("Common", "maxdays")))).strftime(
                 "%Y-%m-%dT%H:%M:%S+02:00")
 
-        configuration['logFile'] = config.get("Logging", "file")
-        configuration['logLevel'] = config.get("Logging", "level")
+        if config.get("Logging", "useLogFile") == 'true':
+            configuration['useLogFile'] = True
+            configuration['logFile'] = config.get("Logging", "file")
+            configuration['logLevel'] = config.get("Logging", "level")
+        else:
+            configuration['useLogFile'] = False
 
     except configparser.NoOptionError as exception:
         print("Missing option in config.ini. Please refer to config_example.ini for the complete set of options.")
@@ -166,7 +172,7 @@ def tag_timeentry_as_error(time_entry_id, time_entry_description, toggl):
     # JSON snippet for marking a time tracking entry using a non-existing or archived project
     payload_for_toggl_error_tag = {
         "time_entry": {
-            "tags": ["nosuchprojecterror"]
+            "tags": ["jiraerror"]
         }
     }
     tagging_response = toggl.put(
@@ -198,12 +204,17 @@ def main():
 
     configuration = read_configuration(config_file)
 
-    logging.basicConfig(filename=configuration['logFile'], level=configuration['logLevel'])
+    if (configuration.get('useLogFile') == True):
+        logging.basicConfig(filename=configuration['filename'], level=configuration['logLevel'])
+    else:
+        logging.basicConfig(level=configuration['logLevel'])
+
 
     all_toggl_projects = {}
 
     toggl_end_time = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
+    #toggl = Toggl(configuration['myTogglApiToken'],version='v9')
     toggl = Toggl(configuration['myTogglApiToken'])
 
     if toggl.Workspaces.get_projects(configuration['myWorkspace']) is not None:
@@ -239,13 +250,39 @@ def main():
                     "description": description,
                     "time_entries": []
                 }
+            error_flag = False
+            if (time_entry.get('id') is None):
+                error_flag = True
+                _logger.warning(
+                    'The time entry with the description "{1}" has has no id and cannot be transmitted to JIRA. Skipping next checks.'.format(
+                        time_entry['description']))
+            if (not error_flag and start_time is None):
+                error_flag = True
+                tag_timeentry_as_error(time_entry['id'], '(missing start time)', toggl)
+                _logger.warning(
+                    'The time entry with the id "{0}" and the description "{1}" has has no start time and cannot be transmitted to JIRA'.format(
+                        str(time_entry['id']), time_entry['description']))
+            if (not error_flag and time_entry.get('duration') is None):
+                error_flag = True
+                tag_timeentry_as_error(time_entry['id'], '(missing duration)', toggl)
+                _logger.warning(
+                    'The time entry with the id "{0}" and the description "{1}" has has no time entry and cannot be transmitted to JIRA'.format(
+                        str(time_entry['id']), time_entry['description']))
+            if (not error_flag and time_entry.get('description') is None):
+                error_flag = True
+                tag_timeentry_as_error(time_entry['id'], '(missing description)', toggl)
+                _logger.warning(
+                    'The time entry with the id "{0}" has has no description and cannot be transmitted to JIRA'.format(
+                        str(time_entry['id'])))
+            if not(error_flag):
+                grouped_time_entries[group_key]["time_entries"].append({
+                    "start_time": start_time,
+                    "duration": time_entry['duration'],
+                    "id": time_entry['id'],
+                    "description": time_entry['description']
+                })
 
-            grouped_time_entries[group_key]["time_entries"].append({
-                "start_time": start_time,
-                "duration": time_entry['duration'],
-                "id": time_entry['id'],
-                "description": time_entry['description']
-            })
+
         else:
             _logger.info(
                 'The time entry with the id "{0}" and the description "{1}" has already been '
@@ -253,61 +290,65 @@ def main():
                     str(time_entry['id']), time_entry['description']))
 
     for key, grouped_time_entry in grouped_time_entries.items():
-        start_time = min(time_entry["start_time"] for time_entry in grouped_time_entry["time_entries"])
+        if (len(grouped_time_entry["time_entries"]) > 0):
+            start_time = min(time_entry["start_time"] for time_entry in grouped_time_entry["time_entries"])
 
-        # when Toggl is running (duration is negative), the entry should be skipped.
-        if (time_entry["duration"] < 0):
-            continue
+            # when Toggl is running (duration is negative), the entry should be skipped.
+            if (time_entry["duration"] < 0):
+                continue
 
-        duration = sum(time_entry["duration"] for time_entry in grouped_time_entry["time_entries"])
-        duration = str(math.ceil(duration / (float(60) * 15)) * 15) + "m"
+            duration = sum(time_entry["duration"] for time_entry in grouped_time_entry["time_entries"])
+            duration = str(math.ceil(duration / (float(60) * 15)) * 15) + "m"
 
-        if (grouped_time_entry["pid"] is not None) and (all_toggl_projects.get(grouped_time_entry["pid"]) is not None):
-            issue = jira.issue(all_toggl_projects[grouped_time_entry['pid']])
-        elif extract_jira_issue_number(grouped_time_entry['description'],
-                                       configuration['issue_number_regex_expression']) is not None:
-            issue_number = extract_jira_issue_number(grouped_time_entry['description'],
-                                                     configuration['issue_number_regex_expression'])
-            try:
-                issue = jira.issue(issue_number)
-            except JIRAError:
-                _logger.error("The issue {0} could not be found in JIRA.".format(str(issue_number)))
+            if (grouped_time_entry["pid"] is not None) and (all_toggl_projects.get(grouped_time_entry["pid"]) is not None):
+                issue = jira.issue(all_toggl_projects[grouped_time_entry['pid']])
+            elif extract_jira_issue_number(grouped_time_entry['description'],
+                                           configuration['issue_number_regex_expression']) is not None:
+                issue_number = extract_jira_issue_number(grouped_time_entry['description'],
+                                                         configuration['issue_number_regex_expression'])
+                try:
+                    issue = jira.issue(issue_number)
+                except JIRAError:
+                    _logger.error("The issue {0} could not be found in JIRA.".format(str(issue_number)))
+                    tag_grouped_timeentry_as_error(grouped_time_entry["time_entries"], toggl)
+                    continue
+            elif (grouped_time_entry["pid"] is not None) and (all_toggl_projects.get(grouped_time_entry["pid"]) is None):
+                _logger.error(
+                    "The project with the id {0} is not in the list of active projects.".format(
+                        str(grouped_time_entry["pid"])))
                 tag_grouped_timeentry_as_error(grouped_time_entry["time_entries"], toggl)
                 continue
-        elif (grouped_time_entry["pid"] is not None) and (all_toggl_projects.get(grouped_time_entry["pid"]) is None):
-            _logger.error(
-                "The project with the id {0} is not in the list of active projects.".format(
-                    str(grouped_time_entry["pid"])))
-            tag_grouped_timeentry_as_error(grouped_time_entry["time_entries"], toggl)
-            continue
-        else:
-            _logger.error("No JIRA issue number could be extracted from time entry project or work description. "
-                          "Therefore no worklog will be inserted in JIRA.")
-            # taggingResponse = _toggl.put(
-            #     uri="https://www.toggl.com/api/v8/time_entries/{0}".format(str(timeEntry['id'])),
-            #     data=_payloadForTogglErrorTag)
-            # if taggingResponse.status_code == 200:
-            #     _logger.info(
-            #      "The time entry with the id \"{0}\" has been tagged as error in Toggl".format(str(timeEntry['id'])))
-            continue
-        if issue is not None:
-            jira_response = insert_jira_worklog(issue, start_time, duration, grouped_time_entry['description'],
-                                                configuration['jiraRePolicy'], jira)
-            if isinstance(jira_response, Worklog):
-                for timeEntry in grouped_time_entry["time_entries"]:
-                    _logger.info(
-                        "A worklog for the time entry with the id \"{0}\" and the description \"{1}\" has been "
-                        "created successfully".format(
-                            str(timeEntry['id']), timeEntry['description']))
-                    tag_timeentry_as_processed(timeEntry['id'], timeEntry['description'], toggl)
             else:
-                _logger.error('No JIRA worklog could be created.')
+                _logger.error("No JIRA issue number could be extracted from time entry project or work description. "
+                              "Therefore no worklog will be inserted in JIRA.")
+                # taggingResponse = _toggl.put(
+                #     uri="https://www.toggl.com/api/v8/time_entries/{0}".format(str(timeEntry['id'])),
+                #     data=_payloadForTogglErrorTag)
+                # if taggingResponse.status_code == 200:
+                #     _logger.info(
+                #      "The time entry with the id \"{0}\" has been tagged as error in Toggl".format(str(timeEntry['id'])))
+                continue
+            if issue is not None:
+                jira_response = insert_jira_worklog(issue, start_time, duration, grouped_time_entry['description'],
+                                                    configuration['jiraRePolicy'], jira)
+                if isinstance(jira_response, Worklog):
+                    for timeEntry in grouped_time_entry["time_entries"]:
+                        _logger.info(
+                            "A worklog for the time entry with the id \"{0}\" and the description \"{1}\" has been "
+                            "created successfully".format(
+                                str(timeEntry['id']), timeEntry['description']))
+                        tag_timeentry_as_processed(timeEntry['id'], timeEntry['description'], toggl)
+                else:
+                    _logger.error('No JIRA worklog could be created.')
+                    tag_grouped_timeentry_as_error(grouped_time_entry["time_entries"], toggl)
+                    continue
+            else:
+                _logger.error('No JIRA issue could be created with the given information.')
                 tag_grouped_timeentry_as_error(grouped_time_entry["time_entries"], toggl)
                 continue
         else:
-            _logger.error('No JIRA issue could be created with the given information.')
-            tag_grouped_timeentry_as_error(grouped_time_entry["time_entries"], toggl)
-            continue
+            grouped_time_entry["time_entries"]
+
 
 
 if __name__ == "__main__":
