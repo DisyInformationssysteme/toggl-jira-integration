@@ -205,7 +205,7 @@ def main():
     configuration = read_configuration(config_file)
 
     if (configuration.get('useLogFile') == True):
-        logging.basicConfig(filename=configuration['filename'], level=configuration['logLevel'])
+        logging.basicConfig(filename=configuration['logFile'], level=configuration['logLevel'])
     else:
         logging.basicConfig(level=configuration['logLevel'])
 
