@@ -289,13 +289,15 @@ def main():
                 'created as worklog in JIRA and subsequently tagged in Toggl'.format(
                     str(time_entry['id']), time_entry['description']))
 
+    # when last Toggl time entry is running (duration is negative), all entries should be skipped.
+    if (time_entry["duration"] < 0):
+        _logger.error("Toggl is still running! No time entries will be processed. "
+                        "Stop the current time entry and execute this script again!")
+        return
+
     for key, grouped_time_entry in grouped_time_entries.items():
         if (len(grouped_time_entry["time_entries"]) > 0):
             start_time = min(time_entry["start_time"] for time_entry in grouped_time_entry["time_entries"])
-
-            # when Toggl is running (duration is negative), the entry should be skipped.
-            if (time_entry["duration"] < 0):
-                continue
 
             duration = sum(time_entry["duration"] for time_entry in grouped_time_entry["time_entries"])
             duration = str(round(duration / (float(60) * 15)) * 15) + "m"
