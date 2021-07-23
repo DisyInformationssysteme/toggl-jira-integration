@@ -219,8 +219,7 @@ def main():
     toggl_end_time = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
     #toggl = Toggl(configuration['myTogglApiToken'],version='v9')
-    toggl = Toggl(configuration['myTogglApiToken'])
-
+    toggl = Toggl(configuration['myTogglApiToken'], base_url='https://api.track.toggl.com/api')
     if toggl.Workspaces.get_projects(configuration['myWorkspace']) is not None:
         all_toggl_projects = extract_jira_issue_numbers(toggl.Workspaces.get_projects(configuration['myWorkspace']),
                                                         configuration['issue_number_regex_expression'])
