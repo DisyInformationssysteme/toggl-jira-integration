@@ -27,6 +27,7 @@ import math
 import configparser
 import getopt
 import sys
+from getpass import getpass
 
 from togglwrapper import Toggl
 from jira import Worklog
@@ -68,7 +69,10 @@ def read_configuration(config_file_name):
 
     try:
         configuration['jiraUser'] = config.get("Jira", "user")
-        configuration['jiraPassword'] = config.get("Jira", "password")
+        if (config.has_option('Jira', 'password')):
+            configuration['jiraPassword'] = config.get("Jira", "password")
+        else:
+            configuration['jiraPassword'] = getpass('Please enter Jira password for user "%s": ' % configuration['jiraUser'])
         configuration['jiraUrl'] = config.get("Jira", "url")
         if config.get("Jira", "remainingEstimatePolicy") == 'leave':
             configuration['jiraRePolicy'] = 'leave'
