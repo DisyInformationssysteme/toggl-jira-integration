@@ -304,7 +304,7 @@ def main():
             start_time = min(time_entry["start_time"] for time_entry in grouped_time_entry["time_entries"])
 
             duration = sum(time_entry["duration"] for time_entry in grouped_time_entry["time_entries"])
-            duration = str(round(duration / (float(60) * 15)) * 15) + "m"
+            duration = str(math.ceil(duration / (float(60) * 15)) * 15) + "m"
 
             if (grouped_time_entry["pid"] is not None) and (all_toggl_projects.get(grouped_time_entry["pid"]) is not None):
                 issue = jira.issue(all_toggl_projects[grouped_time_entry['pid']])
