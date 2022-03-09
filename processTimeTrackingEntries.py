@@ -51,6 +51,7 @@ def read_configuration(config_file_name):
                      'jiraUser': None,
                      'jiraPassword': None,
                      'jiraUrl': None,
+                     'jiraToken': None,
                      'jiraRePolicy': None,
                      'myTogglApiToken': None,
                      'myWorkspace': None,
@@ -68,11 +69,15 @@ def read_configuration(config_file_name):
     config.read(config_file_name)
 
     try:
-        configuration['jiraUser'] = config.get("Jira", "user")
-        if (config.has_option('Jira', 'password')):
-            configuration['jiraPassword'] = config.get("Jira", "password")
+        if (config.has_option('Jira', 'token')):
+            configuration['jiraToken'] = config.get("Jira", "token")
         else:
-            configuration['jiraPassword'] = getpass('Please enter Jira password for user "%s": ' % configuration['jiraUser'])
+            configuration['jiraUser'] = config.get("Jira", "user")
+            if (config.has_option('Jira', 'password')):
+                configuration['jiraPassword'] = config.get("Jira", "password")
+            else:
+                configuration['jiraPassword'] = getpass('Please enter Jira password for user "%s": ' % configuration['jiraUser'])
+
         configuration['jiraUrl'] = config.get("Jira", "url")
         if config.get("Jira", "remainingEstimatePolicy") == 'leave':
             configuration['jiraRePolicy'] = 'leave'
@@ -228,7 +233,10 @@ def main():
     new_time_tracking_entries = toggl.TimeEntries.get(start_date=configuration['togglStartTime'],
                                                       end_date=toggl_end_time)
 
-    jira = JIRA(configuration['jiraUrl'], basic_auth=(configuration['jiraUser'], configuration['jiraPassword']))
+    if configuration['jiraToken'] is not None:
+        jira = JIRA(configuration['jiraUrl'], token_auth=configuration['jiraToken'])
+    else:
+        jira = JIRA(configuration['jiraUrl'], basic_auth=(configuration['jiraUser'], configuration['jiraPassword']))
 
     grouped_time_entries = {}
 
