@@ -247,6 +247,10 @@ def main():
             description = time_entry['description'] if 'description' in time_entry else ''
             group_key = str(pid) + "_" + description
 
+            if (time_entry["duration"] < 0):
+              continue
+
+
             start_time = dateutil.parser.parse(time_entry['start'])
 
             if configuration['groupTimeEntriesBy'] == 'day':
@@ -304,10 +308,6 @@ def main():
     for key, grouped_time_entry in grouped_time_entries.items():
         if (len(grouped_time_entry["time_entries"]) > 0):
             start_time = min(time_entry["start_time"] for time_entry in grouped_time_entry["time_entries"])
-
-            # when Toggl is running (duration is negative), the entry should be skipped.
-            if (time_entry["duration"] < 0):
-                continue
 
             duration = sum(time_entry["duration"] for time_entry in grouped_time_entry["time_entries"])
             duration = str(math.ceil(duration / (float(60) * 15)) * 15) + "m"
