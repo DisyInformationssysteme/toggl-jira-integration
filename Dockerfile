@@ -1,5 +1,5 @@
 ARG IMAGE_NAME=library/python
-ARG IMAGE_TAG=3.10-slim
+ARG IMAGE_TAG=3.11-slim
 FROM ${IMAGE_NAME}:${IMAGE_TAG}
 
 COPY ./processTimeTrackingEntries.py /
