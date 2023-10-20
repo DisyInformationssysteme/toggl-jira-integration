@@ -90,7 +90,7 @@ def read_configuration(config_file_name):
             configuration['togglStartTime'] = config.get("Common", "startdate")
         else:
             configuration['togglStartTime'] = (
-                datetime.datetime.utcnow() - datetime.timedelta(int(config.get("Common", "maxdays")))).strftime(
+                datetime.datetime.now(datetime.UTC) - datetime.timedelta(int(config.get("Common", "maxdays")))).strftime(
                 "%Y-%m-%dT%H:%M:%S+02:00")
 
         if config.get("Logging", "useLogFile") == 'true':
@@ -216,7 +216,7 @@ def main():
 
     all_toggl_projects = {}
 
-    toggl_end_time = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    toggl_end_time = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
     #toggl = Toggl(configuration['myTogglApiToken'],version='v9')
     toggl = Toggl(configuration['myTogglApiToken'])
